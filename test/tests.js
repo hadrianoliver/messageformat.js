@@ -712,6 +712,34 @@ describe( "MessageFormat", function () {
         expect(mfunc({NUM:42})).to.eql('omg42');
       });
 
+      it("can correctly pull in multiple pluralization rule sets", function () {
+        // note, cy.js was included in the html file for the browser
+        // and then in the common.js file
+        var mf = new MessageFormat( [ 'cy', 'en-au-xi', 'en' ] );
+        expect(mf.lc).to.contain( 'cy' );
+        expect(mf.lc).to.contain( 'en-au-xi' );
+        expect(mf.lc).to.contain( 'en-au' );
+        expect(mf.lc).to.contain( 'en' );
+        expect(mf.runtime.pluralFuncs.cy).to.be.a('function');
+        expect(mf.runtime.pluralFuncs['en-au-xi']).to.be.a('function');
+        expect(mf.runtime.pluralFuncs.en).to.be.a('function');
+        expect(mf.runtime.pluralFuncs.en).to.eql(mf.runtime.pluralFuncs['en-au-xi']);
+      });
+
+      it("can correctly pull in pluralization rules sets for locales used when compiling", function () {
+        // note, cy.js was included in the html file for the browser
+        // and then in the common.js file
+        var mf = new MessageFormat();
+        var opt = { locale: { welsh: 'cy-not-real' } };
+        var mfunc = mf.compile({ welsh: { friends: 'Mae gen i {FRIENDS, plural, one{un ffrind} other{# ffrindiau}}.' } }, opt );
+        expect(mfunc).to.be.a( 'function' );
+        expect(mfunc()).to.be.an( 'object' );
+        expect(mfunc().welsh).to.be.an( 'object' );
+        expect(mfunc().welsh.friends).to.be.a( 'function' );
+        expect(mfunc().welsh.friends({ FRIENDS: 1 })).to.eql('Mae gen i un ffrind.');
+        expect(mfunc().welsh.friends({ FRIENDS: 2 })).to.eql('Mae gen i 2 ffrindiau.');
+      });
+
       it("can parse complex, real-world messages with nested selects and plurals with offsets", function () {
         var input = "" +
         "{PERSON} added {PLURAL_NUM_PEOPLE, plural, offset:1" +
@@ -807,6 +835,95 @@ describe( "MessageFormat", function () {
         expect(mfunc().key).to.be.a('function');
         expect(mfunc().key({FRIENDS:1})).to.eql("I have one friend.");
         expect(mfunc().key({FRIENDS:2})).to.eql("I have 2 friends.");
+      });
+
+      it("can compile a nested object of messages into an object with namespaced functions", function () {
+        var mf = new MessageFormat( 'en' );
+        var data = {
+          namespace1: {
+            key1: 'I have {FRIENDS, plural, one{one friend} other{# friends}}.',
+            namespace2: {
+              key2: 'I also have {FRIENDS, plural, one{one friend} other{# friends}}.'
+            }
+          }
+        };
+        var mfunc = mf.compile(data);
+        expect(mfunc).to.be.a('function');
+
+        expect(mfunc()).to.be.an('object');
+
+        expect(mfunc()['namespace1']).to.be.an('object');
+        expect(mfunc()['namespace1'].key1).to.be.a( 'function' );
+        expect(mfunc()['namespace1'].key1({FRIENDS:1})).to.eql("I have one friend.");
+        expect(mfunc()['namespace1'].key1({FRIENDS:2})).to.eql("I have 2 friends.");
+
+        expect(mfunc()['namespace1/namespace2']).to.be.an('object');
+        expect(mfunc()['namespace1/namespace2'].key2).to.be.a( 'function' );
+        expect(mfunc()['namespace1/namespace2'].key2({FRIENDS:1})).to.eql("I also have one friend.");
+        expect(mfunc()['namespace1/namespace2'].key2({FRIENDS:2})).to.eql("I also have 2 friends.");
+      });
+
+      it("can compile a locale indexed nested object into a locale indexed object with namespaced functions", function () {
+        var mf = new MessageFormat( ['en','cy'] );
+        var data = {
+          'en': {
+            key0: 'I have no friends.',
+            namespace1: {
+              key1: 'I have {FRIENDS, plural, one{one friend} other{# friends}}.',
+              namespace2: {
+                key2: 'I also have {FRIENDS, plural, one{one friend} other{# friends}}.'
+              }
+            }
+          },
+          'cy': {
+            key0: 'Nid oes gennyf unrhyw ffrindiau.',
+            namespace1: {
+              key1: 'Mae gen i {FRIENDS, plural, one{un ffrind} other{# ffrindiau}}.',
+              namespace2: {
+                key2: 'Rwyf hefyd yn cael {FRIENDS, plural, one{un ffrind} other{# ffrindiau}}.'
+              }
+            }
+          }
+        };
+
+        expect(mf.lc).to.contain( 'en' );
+        expect(mf.lc).to.contain( 'cy' );
+
+        expect(mf.runtime.pluralFuncs.en).to.be.a( 'function' );
+        expect(mf.runtime.pluralFuncs.cy).to.be.a( 'function' );
+
+        var mfunc = mf.compile(data, { locale: { en: 'en', cy: 'cy' } });
+        expect(mfunc).to.be.a('function');
+
+        expect(mfunc()).to.be.an('object');
+
+        expect(mfunc().en).to.be.an('object');
+        expect(mfunc().en.key0).to.be.a('function');
+        expect(mfunc().en.key0()).to.eql('I have no friends.');
+
+        expect(mfunc().en.namespace1).to.be.an('object');
+        expect(mfunc().en.namespace1.key1).to.be.a( 'function' );
+        expect(mfunc().en.namespace1.key1({FRIENDS:1})).to.eql("I have one friend.");
+        expect(mfunc().en.namespace1.key1({FRIENDS:2})).to.eql("I have 2 friends.");
+
+        expect(mfunc().en['namespace1/namespace2']).to.be.an('object');
+        expect(mfunc().en['namespace1/namespace2'].key2).to.be.a( 'function' );
+        expect(mfunc().en['namespace1/namespace2'].key2({FRIENDS:1})).to.eql("I also have one friend.");
+        expect(mfunc().en['namespace1/namespace2'].key2({FRIENDS:2})).to.eql("I also have 2 friends.");
+
+        expect(mfunc().cy).to.be.an('object');
+        expect(mfunc().cy.key0).to.be.a('function');
+        expect(mfunc().cy.key0()).to.eql('Nid oes gennyf unrhyw ffrindiau.');
+
+        expect(mfunc().cy['namespace1']).to.be.an('object');
+        expect(mfunc().cy['namespace1'].key1).to.be.a( 'function' );
+        expect(mfunc().cy['namespace1'].key1({FRIENDS:1})).to.eql("Mae gen i un ffrind.");
+        expect(mfunc().cy['namespace1'].key1({FRIENDS:2})).to.eql("Mae gen i 2 ffrindiau.");
+
+        expect(mfunc().cy['namespace1/namespace2']).to.be.an('object');
+        expect(mfunc().cy['namespace1/namespace2'].key2).to.be.a( 'function' );
+        expect(mfunc().cy['namespace1/namespace2'].key2({FRIENDS:1})).to.eql("Rwyf hefyd yn cael un ffrind.");
+        expect(mfunc().cy['namespace1/namespace2'].key2({FRIENDS:2})).to.eql("Rwyf hefyd yn cael 2 ffrindiau.");
       });
     });
   });
