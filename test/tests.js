@@ -824,6 +824,27 @@ describe( "MessageFormat", function () {
         expect(mfunc().unreserved).to.be.a('function');
         expect(mfunc().unreserved()).to.eql("unreserved is not a JavaScript reserved word so should not be quoted");
       });
+
+      it("can compile an object with namespaced key/string maps and pull in the plural functions for their locales", function () {
+        var mf = new MessageFormat();
+        var data = { welsh:   { 'key': 'I have {FRIENDS, plural, zero{no friends} one{one friend} other{# friends}}.' },
+                     english: { 'key': 'I have {FRIENDS, plural, zero{no friends} one{one friend} other{# friends}}.' } };
+        var opt = { locale: { english: 'en', welsh: 'cy' } };
+        var mfunc = mf.compile(data, opt);
+        expect(mfunc).to.be.a('function');
+
+        expect(mfunc().english).to.be.an('object');
+        expect(mfunc().english.key).to.be.a('function');
+        expect(mfunc().english.key({FRIENDS:0})).to.eql("I have 0 friends.");
+        expect(mfunc().english.key({FRIENDS:1})).to.eql("I have one friend.");
+        expect(mfunc().english.key({FRIENDS:33})).to.eql("I have 33 friends.");
+
+        expect(mfunc().welsh).to.be.an('object');
+        expect(mfunc().welsh.key).to.be.a('function');
+        expect(mfunc().welsh.key({FRIENDS:0})).to.eql("I have no friends.");
+        expect(mfunc().welsh.key({FRIENDS:1})).to.eql("I have one friend.");
+        expect(mfunc().welsh.key({FRIENDS:33})).to.eql("I have 33 friends.");
+      });
     });
   });
 
