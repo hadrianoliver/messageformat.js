@@ -920,11 +920,7 @@ describe( "MessageFormat", function () {
 
         expect(mf.runtime.pluralFuncs.en).to.be.a( 'function' );
 
-        var mfunc = mf.compile(data,
-                              {
-                                locale: { en: 'en', cy: 'cy' },
-                                rootIsLocale: true
-                              });
+        var mfunc = mf.compile(data, { rootIsLocale: true, locale: { en: 'en', cy: 'cy' } });
         expect(mfunc).to.be.a('function');
 
         expect(mfunc()).to.be.an( 'object' );
